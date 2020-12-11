@@ -22,8 +22,8 @@ var CL = "CL" // Close Long. The signal to end a long trade.
 var DS = "DS" // Direction Short.
 var DL = "DL" // Direction Long.
 
-var HR = #d32f2f
-var HG = #388e3c
+var HR = #d32f2f // Hex Red. The red color for our color scheme indicating short trades. 
+var HG = #388e3c // Hex Green. The green color for our color scheme indicating long trades. 
 
 
 
