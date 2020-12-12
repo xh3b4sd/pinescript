@@ -541,9 +541,9 @@ if new_pdl()
 
 
 
-plotshape(cos,             text=OS, location=location.abovebar, style=shape.circle, size=size.small, color=HR, textcolor=color.white, transp=30)
-plotshape(ccs and not lfs, text=CS, location=location.belowbar, style=shape.circle, size=size.small, color=HR, textcolor=color.white, transp=30)
-plotshape(ccs and     lfs, text=CS, location=location.belowbar, style=shape.xcross, size=size.small, color=HR, textcolor=color.white, transp=30)
-plotshape(col,             text=OL, location=location.abovebar, style=shape.circle, size=size.small, color=HG, textcolor=color.white, transp=30)
-plotshape(ccl and not lfl, text=CL, location=location.belowbar, style=shape.circle, size=size.small, color=HG, textcolor=color.white, transp=30)
-plotshape(ccl and     lfl, text=CL, location=location.belowbar, style=shape.xcross, size=size.small, color=HG, textcolor=color.white, transp=30)
+plotshape(cos,             text=OS, location=location.abovebar, style=shape.circle, size=size.tiny, color=HR, textcolor=color.white, transp=30)
+plotshape(ccs and not lfs, text=CS, location=location.belowbar, style=shape.circle, size=size.tiny, color=HR, textcolor=color.white, transp=30)
+plotshape(ccs and     lfs, text=CS, location=location.belowbar, style=shape.xcross, size=size.tiny, color=HR, textcolor=color.white, transp=30)
+plotshape(col,             text=OL, location=location.abovebar, style=shape.circle, size=size.tiny, color=HG, textcolor=color.white, transp=30)
+plotshape(ccl and not lfl, text=CL, location=location.belowbar, style=shape.circle, size=size.tiny, color=HG, textcolor=color.white, transp=30)
+plotshape(ccl and     lfl, text=CL, location=location.belowbar, style=shape.xcross, size=size.tiny, color=HG, textcolor=color.white, transp=30)
