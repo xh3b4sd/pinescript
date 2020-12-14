@@ -14,20 +14,9 @@ study(title="RTF DEV Indicator", overlay=true)
 
 
 
-bbl = 26  //bbl = input(title="BBI Band Length",    type=input.integer, defval=26,   minval=1,    step=1  )
-bbs = 2   //bbs = input(title="BBI Band Stddev",    type=input.float,   defval=2.00, minval=0.1,  step=0.1)
-bpp = 20  //bpp = input(title="BBI Pivot Point",    type=input.float,   defval=20,   minval=0.01, step=1  )
-prb = 10 // prb = input(title="PAI Recent Bar",     type=input.integer, defval=10,     minval=1,      step=1  )
-
-
-
-// -------------------------------------------------------------------------- //
-
-
-
 rlt = input(title="RTF Loss Tolerance", type=input.float,   defval=2.0,    minval=0.1,     step=0.1    )
-rpb = input(title="RTF Pause Bar",      type=input.integer, defval=1,     minval=1,        step=1      )
-rtp = input(title="RTF Take Profit",    type=input.float,   defval=0.1,    minval=0.1,     step=0.1    )
+rpb = input(title="RTF Pause Bar",      type=input.integer, defval=25,     minval=1,       step=1      )
+rtp = input(title="RTF Take Profit",    type=input.float,   defval=0.4,    minval=0.1,     step=0.1    )
 sst = input(title="SAR Start",          type=input.float,   defval=0.02,   minval=0.01,    step=1      )
 sin = input(title="SAR Increment",      type=input.float,   defval=0.0002, minval=0.00001, step=0.00001)
 sma = input(title="SAR Maximum",        type=input.float,   defval=0.2,    minval=0.01,    step=1      )
@@ -338,51 +327,6 @@ new_per(abs, fra) =>
 
 
 
-// new_bbu returns the upper bollinger band based on the length given by bbl and
-// the standard deviation given by bbs. Here bbu means bollinger band upper.
-new_bbu(src, bbl, bbs) =>
-    sma(src, bbl) + bbs * stdev(src, bbl)
-
-new_bbi(src, bbl, bbs) =>
-    bbu = new_bbu(src, bbl, bbs)
-
-    cou = 0
-    bac = 8
-
-    for i = 0 to bac
-        cou := high[i] > bbu[i] and bbu[i] > low[i] ? cou + 1 : cou
-
-    new_per(bac, cou) > bpp and not (high[0] > bbu[0] and bbu[0] > low[0])
-
-
-
-// -------------------------------------------------------------------------- //
-
-
-
-// new_rsb returns the relative strength indicator for the current bar, based on
-// the running moving average. Here rsb means relative strength bar.
-new_rsb(src, rsl) =>
-    upw = rma( max(change(src), 0), rsl)
-    dow = rma(-min(change(src), 0), rsl)
-
-    dow == 0 ? 100 : upw == 0 ? 0 : 100 - (100 / (1 + upw / dow))
-
-// new_rsi returns the relative strength indicator for overbought price peaks.
-new_rsi(src) =>
-    one = new_rsb(src, 120)[1] < 57 and new_rsb(src, 120)[0] > 57
-    two = new_rsb(src, 50 )[1] < 65 and new_rsb(src, 50 )[0] > 65
-    thr = new_rsb(src, 30 )[1] < 70 and new_rsb(src, 30 )[0] > 70
-    fou = new_rsb(src, 17 )[1] < 63 and new_rsb(src, 17 )[0] > 63
-
-    one or two or thr or fou
-
-
-
-// -------------------------------------------------------------------------- //
-
-
-
 // new_hpi returns a high price indicator for the most recent bars since prb.
 // Here hpi means high price indicator.
 new_hpi(prb) =>
@@ -473,6 +417,7 @@ new_nlt() =>
 if new_dci()
     res_cfc()
     res_cpc()
+    inc_cpc()
 
 
 
@@ -576,9 +521,7 @@ new_cyc() =>
         rem_ccc(CL)
 
         sos := false
-        scs := false
         sol := false
-        scl := false
 
         set_cdf("6")
 
@@ -620,9 +563,6 @@ set_ctp(sos or sol ? FP : "")
 
 if lfs or lfl
     inc_cfc()
-
-    sos := false
-    sol := false
 
 if scs or scl
     inc_cpc()
