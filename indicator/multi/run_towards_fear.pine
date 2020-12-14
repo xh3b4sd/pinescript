@@ -6,7 +6,7 @@
 
 
 
-study(title="RTF Indicator", overlay=true)
+study(title="RTF DEV Indicator", overlay=true)
 
 
 
@@ -14,13 +14,23 @@ study(title="RTF Indicator", overlay=true)
 
 
 
-bbl = input(title="BBI Band Length",    type=input.integer, defval=26,   minval=1,    step=1  )
-bbs = input(title="BBI Band Stddev",    type=input.float,   defval=2.00, minval=0.1,  step=0.1)
-bpp = input(title="BBI Pivot Point",    type=input.float,   defval=20,   minval=0.01, step=1  )
-hrb = input(title="HPI Recent Bar",     type=input.integer, defval=200,  minval=1,    step=1  )
-rlt = input(title="RTF Loss Tolerance", type=input.float,   defval=0.6,  minval=0.1,  step=0.1)
-rpb = input(title="RTF Pause Bar",      type=input.integer, defval=11,   minval=1,    step=1  )
-rtp = input(title="RTF Take Profit",    type=input.float,   defval=0.5,  minval=0.1,  step=0.1)
+bbl = 26  //bbl = input(title="BBI Band Length",    type=input.integer, defval=26,   minval=1,    step=1  )
+bbs = 2   //bbs = input(title="BBI Band Stddev",    type=input.float,   defval=2.00, minval=0.1,  step=0.1)
+bpp = 20  //bpp = input(title="BBI Pivot Point",    type=input.float,   defval=20,   minval=0.01, step=1  )
+prb = 10 // prb = input(title="PAI Recent Bar",     type=input.integer, defval=10,     minval=1,      step=1  )
+
+
+
+// -------------------------------------------------------------------------- //
+
+
+
+rlt = input(title="RTF Loss Tolerance", type=input.float,   defval=2.0,    minval=0.1,     step=0.1    )
+rpb = input(title="RTF Pause Bar",      type=input.integer, defval=1,     minval=1,        step=1      )
+rtp = input(title="RTF Take Profit",    type=input.float,   defval=0.1,    minval=0.1,     step=0.1    )
+sst = input(title="SAR Start",          type=input.float,   defval=0.02,   minval=0.01,    step=1      )
+sin = input(title="SAR Increment",      type=input.float,   defval=0.0002, minval=0.00001, step=0.00001)
+sma = input(title="SAR Maximum",        type=input.float,   defval=0.2,    minval=0.01,    step=1      )
 
 
 
@@ -30,6 +40,37 @@ rtp = input(title="RTF Take Profit",    type=input.float,   defval=0.5,  minval=
 
 var HR = #d32f2f // Hex Red. The red color for our color scheme indicating short trades.
 var HG = #388e3c // Hex Green. The green color for our color scheme indicating long trades.
+
+
+
+// -------------------------------------------------------------------------- //
+
+
+
+// new_psi returns parabolic SAR indicators for short and long trends.
+//
+//     sta    0.02
+//     inc    0.0003
+//     max    0.2
+//
+new_psi(sta, inc, max) =>
+    dir = sar(sta, inc, max) < close ? 1 : -1
+
+    sho = dir == -1 and dir[1] == 1 // Short direction indicator.
+    lon = dir == 1 and dir[1] == -1 // Long direction indicator.
+    cha = dir != dir[1]             // Change direction indicator.
+
+    [sho, lon, cha]
+
+new_psh() =>
+    [sho, lon, cha] = new_psi(sst, sin, sma)
+
+    sho
+
+new_plo() =>
+    [sho, lon, cha] = new_psi(sst, sin, sma)
+
+    lon
 
 
 
@@ -210,6 +251,42 @@ res_cpc() =>
 
 
 
+// Preferred Direction.
+var PD = array.new_string(1, "")
+
+has_cpd(v) =>
+    has = false
+
+    if v == DS
+        has := array.get(PD, 0) == DS
+    if v == DL
+        has := array.get(PD, 0) == DL
+
+    has
+
+ini_cpd() =>
+    [sho, lon, cha] = new_psi(sst, sin, sma)
+
+    if sho
+        array.set(PD, 0, DS)
+
+    if lon
+        array.set(PD, 0, DL)
+
+set_cpd(v) =>
+    if v == DS
+        array.set(PD, 0, DS)
+    if v == DL
+        array.set(PD, 0, DL)
+
+ini_cpd()
+
+
+
+// -------------------------------------------------------------------------- //
+
+
+
 // Trade Price. The entry price and exit price of our current trade. Based on
 // these prices and their delta we decide when to take profit and when to move
 // on.
@@ -306,15 +383,15 @@ new_rsi(src) =>
 
 
 
-// new_hpi returns a high price indicator for the most recent bars since hrb.
+// new_hpi returns a high price indicator for the most recent bars since prb.
 // Here hpi means high price indicator.
-new_hpi(hrb) =>
-    highest(close, hrb) == close
+new_hpi(prb) =>
+    highest(close, prb) == close
 
-// new_lpi returns a low price indicator for the most recent bars since hrb.
+// new_lpi returns a low price indicator for the most recent bars since prb.
 // Here lpi means low price indicator.
-new_lpi(hrb) =>
-    lowest(close, hrb) == close
+new_lpi(prb) =>
+    lowest(close, prb) == close
 
 
 
@@ -322,11 +399,32 @@ new_lpi(hrb) =>
 
 
 
+// new_dci returns a direction change indicator. If we go PSAR indicated from
+// short to long or from long to short new_dci returns true.
+new_dci() =>
+    [sho, lon, cha] = new_psi(sst, sin, sma)
+
+    cha
+
+
+
+// -------------------------------------------------------------------------- //
+
+
+
+// new_lfs returns a signal for short trades having made a loss.
 new_lfs() =>
-    100 - new_per(close, get_ctp(FP)) >= rlt
+    hdl = has_cpd(DL)
+    los = 100 - new_per(high, get_ctp(FP)) >= rlt
 
+    hdl or los
+
+// new_lfl returns a signal for long trades having made a loss.
 new_lfl() =>
-    100 - new_per(get_ctp(FP), close) >= rlt
+    hds = has_cpd(DS)
+    los = 100 - new_per(get_ctp(FP), low) >= rlt
+
+    hds or los
 
 
 
@@ -334,39 +432,47 @@ new_lfl() =>
 
 
 
-// new_cos returns a signal to open a short position. This signals the beginning
-// of a trade aiming to profit from downward trends. After opening a short
-// position we wait for the close short signal. Here cos means cycle open short.
-new_cos() =>
-    src = close
+// new_pfs returns a signal for short trades having made a profit.
+new_pfs() =>
+    100 - new_per(get_ctp(FP), high) >= rtp
 
-    bbi = new_bbi(src, bbl, bbs)
-    hpi = new_hpi(hrb) or new_hpi(hrb / 2)
-    rsi = new_rsi(src)
+// new_pfl returns a signal for long trades having made a profit.
+new_pfl() =>
+    100 - new_per(low, get_ctp(FP)) >= rtp
 
-    bhi = (bbi[0] and hpi[0]) or (bbi[0] and hpi[1]) or (bbi[1] and hpi[0])
-    bri = (bbi[0] and rsi[0]) or (bbi[0] and rsi[1]) or (bbi[1] and rsi[0])
-    hri = (hpi[0] and rsi[0]) or (hpi[0] and rsi[1]) or (hpi[1] and rsi[0])
 
-    bhi or bri or hri
 
-// new_ccs returns a signal to close a short position. This signals the end of a
-// trade aiming to profit from downward trends. After closing a short position
-// we wait for the open long signal. Here ccs means cycle close short.
-new_ccs() =>
-    100 - new_per(get_ctp(FP), close) >= rtp
+// -------------------------------------------------------------------------- //
 
-// new_col returns a signal to open a long position. This signals the beginning
+
+
+// new_nst returns a signal for a new short trade. This signals the beginning of
+// a trade aiming to profit from downward trends. After opening a short position
+// we wait for the close short signal. Here nst means new short trade.
+new_nst() =>
+    hdc = has_cpd(DS) and new_dci()
+    hds = has_cpd(DS)
+
+    hdc or hds
+
+// new_nlt returns a signal to open a long position. This signals the beginning
 // of a trade aiming to profit from upward trends. After opening a long position
-// we wait for the close long signal. Here col means cycle open long.
-new_col() =>
-    new_lpi(hrb) or new_lpi(hrb / 2)
+// we wait for the close long signal. Here sol means new long trade.
+new_nlt() =>
+    hdc = has_cpd(DL) and new_dci()
+    hdl = has_cpd(DL)
 
-// new_ccl returns a signal to close a long position. This signals the end of a
-// trade aiming to profit from upward trends. After closing a long position we
-// wait for the open short signal. Here ccl means cycle close long.
-new_ccl() =>
-    100 - new_per(close, get_ctp(FP)) >= rtp
+    hdc or hdl
+
+
+
+// -------------------------------------------------------------------------- //
+
+
+
+if new_dci()
+    res_cfc()
+    res_cpc()
 
 
 
@@ -375,42 +481,47 @@ new_ccl() =>
 
 
 new_cyc() =>
-    lfs = new_lfs()
-    lfl = new_lfl()
+    sos = false     // Signal Open Short.
+    scs = false     // Signal Close Short.
+    sol = false     // Signal Open Long.
+    scl = false     // Signal Close Long.
 
-    cos = new_cos()
-    ccs = new_ccs()
-    col = new_col()
-    ccl = new_ccl()
+    nst = new_nst() // New Short Trade.
+    nlt = new_nlt() // New Long Trade.
 
-    cct = false // Constant Cycle Tracked.
+    lfs = new_lfs() // Loss For Short.
+    pfs = new_pfs() // Profit For Short.
+    lfl = new_lfl() // Loss For Long.
+    pfl = new_pfl() // Profit For Long.
+
+    cct = false     // Current Cycle Tracked.
 
     if emp_ccc()
-        if cos
+        if nst
             set_ccc(OS)
             rem_ccc(CS)
             rem_ccc(OL)
             rem_ccc(CL)
 
-            cos := true
-            ccs := false
-            col := false
-            ccl := false
+            sos := true
+            scs := false
+            sol := false
+            scl := false
 
             cct := true
 
             set_cdf("1")
 
-        else if col
+        else if nlt
             rem_ccc(OS)
             rem_ccc(CS)
             set_ccc(OL)
             rem_ccc(CL)
 
-            cos := false
-            ccs := false
-            col := true
-            ccl := false
+            sos := false
+            scs := false
+            sol := true
+            scl := false
 
             cct := true
 
@@ -418,75 +529,45 @@ new_cyc() =>
 
     else
         if onl_ccc(OS)
-            if ccs
-                set_ccc(OS)
+            if pfs or lfs
+                rem_ccc(OS)
                 rem_ccc(CS)
                 rem_ccc(OL)
                 rem_ccc(CL)
 
-                cos := true
-                ccs := true
-                col := false
-                ccl := false
+                sos := false
+                scs := true
+                sol := false
+                scl := false
 
                 cct := true
 
                 set_cdf("3")
 
-            else if lfs
-                rem_ccc(OS)
-                rem_ccc(CS)
-                set_ccc(OL)
-                rem_ccc(CL)
-
-                cos := false
-                ccs := true
-                col := true
-                ccl := false
-
-                cct := true
-
-                set_cdf("4")
-
         else
             if onl_ccc(OL)
-                if ccl
+                if pfl or lfl
                     rem_ccc(OS)
-                    rem_ccc(CS)
-                    set_ccc(OL)
-                    rem_ccc(CL)
-
-                    cos := false
-                    ccs := false
-                    col := true
-                    ccl := true
-
-                    cct := true
-
-                    set_cdf("5")
-
-                else if lfl
-                    set_ccc(OS)
                     rem_ccc(CS)
                     rem_ccc(OL)
                     rem_ccc(CL)
 
-                    cos := true
-                    ccs := false
-                    col := false
-                    ccl := true
+                    sos := false
+                    scs := false
+                    sol := false
+                    scl := true
 
                     cct := true
 
-                    set_cdf("6")
+                    set_cdf("4")
 
     if not cct
-        cos := false
-        ccs := false
-        col := false
-        ccl := false
+        sos := false
+        scs := false
+        sol := false
+        scl := false
 
-        set_cdf("7")
+        set_cdf("5")
 
     if get_cpc() > 0
         rem_ccc(OS)
@@ -494,21 +575,21 @@ new_cyc() =>
         rem_ccc(OL)
         rem_ccc(CL)
 
-        cos := false
-        ccs := false
-        col := false
-        ccl := false
+        sos := false
+        scs := false
+        sol := false
+        scl := false
 
-        set_cdf("8")
+        set_cdf("6")
 
-    [cos, ccs, col, ccl]
+    [sos, scs, sol, scl]
 
 
 // -------------------------------------------------------------------------- //
 
 
 
-[cos, ccs, col, ccl] = new_cyc()
+[sos, scs, sol, scl] = new_cyc()
 
 
 
@@ -520,16 +601,16 @@ new_cyc() =>
 // allows us to calculate the profit or loss considering the sequential nature
 // of pine script execution. Only after the last price is tracked and the loss
 // statement is collected we can track the new first price of the next trade.
-// Here ffs means failure for short. Here ffl means failure for long.
+// Here lfs means loss for short. Here lfl means loss for long.
 
 
 
-set_ctp(ccs or ccl ? LP : "")
+set_ctp(scs or scl ? LP : "")
 
-ffs = ccs and les_ctp() < 0 ? true : false
-ffl = ccl and gre_ctp() < 0 ? true : false
+lfs = scs and les_ctp() < 0 ? true : false
+lfl = scl and gre_ctp() < 0 ? true : false
 
-set_ctp(cos or col ? FP : "")
+set_ctp(sos or sol ? FP : "")
 
 
 
@@ -537,11 +618,14 @@ set_ctp(cos or col ? FP : "")
 
 
 
-if ffs or ffl
+if lfs or lfl
     inc_cfc()
 
-    cos := false
-    col := false
+    sos := false
+    sol := false
+
+if scs or scl
+    inc_cpc()
 
 if get_cfc() >= 1 or get_cpc() > 0
     inc_cpc()
@@ -549,6 +633,15 @@ if get_cfc() >= 1 or get_cpc() > 0
     if get_cpc() >= rpb
         res_cfc()
         res_cpc()
+
+
+
+// -------------------------------------------------------------------------- //
+
+
+
+// plotshape(has_cpd(DS), text="DS", location=location.belowbar, style=shape.labelup, size=size.small, color=color.purple, textcolor=color.white, transp=50)
+// plotshape(has_cpd(DL), text="DL", location=location.belowbar, style=shape.labelup, size=size.small, color=color.purple, textcolor=color.white, transp=50)
 
 
 
@@ -571,12 +664,12 @@ if get_cfc() >= 1 or get_cpc() > 0
 
 
 
-plotshape(cos,             text=OS, location=location.abovebar, style=shape.triangledown, size=size.tiny, color=HR, textcolor=color.white, transp=30)
-plotshape(ccs and not ffs, text=CS, location=location.belowbar, style=shape.triangleup,   size=size.tiny, color=HR, textcolor=color.white, transp=30)
-plotshape(ccs and     ffs, text=CS, location=location.belowbar, style=shape.xcross,       size=size.tiny, color=HR, textcolor=color.white, transp=30)
-plotshape(col,             text=OL, location=location.abovebar, style=shape.triangledown, size=size.tiny, color=HG, textcolor=color.white, transp=30)
-plotshape(ccl and not ffl, text=CL, location=location.belowbar, style=shape.triangleup,   size=size.tiny, color=HG, textcolor=color.white, transp=30)
-plotshape(ccl and     ffl, text=CL, location=location.belowbar, style=shape.xcross,       size=size.tiny, color=HG, textcolor=color.white, transp=30)
+plotshape(sos,             text=OS, location=location.abovebar, style=shape.triangledown, size=size.tiny, color=HR, textcolor=color.white, transp=30)
+plotshape(scs and not lfs, text=CS, location=location.belowbar, style=shape.triangleup,   size=size.tiny, color=HR, textcolor=color.white, transp=30)
+plotshape(scs and     lfs, text=CS, location=location.belowbar, style=shape.xcross,       size=size.tiny, color=HR, textcolor=color.white, transp=30)
+plotshape(sol,             text=OL, location=location.abovebar, style=shape.triangledown, size=size.tiny, color=HG, textcolor=color.white, transp=30)
+plotshape(scl and not lfl, text=CL, location=location.belowbar, style=shape.triangleup,   size=size.tiny, color=HG, textcolor=color.white, transp=30)
+plotshape(scl and     lfl, text=CL, location=location.belowbar, style=shape.xcross,       size=size.tiny, color=HG, textcolor=color.white, transp=30)
 
 
 
@@ -584,7 +677,7 @@ plotshape(ccl and     ffl, text=CL, location=location.belowbar, style=shape.xcro
 
 
 
-alertcondition(condition=cos, title=OS, message="Triggered Open Short Signal")
-alertcondition(condition=ccs, title=CS, message="Triggered Close Short Signal")
-alertcondition(condition=col, title=OL, message="Triggered Open Long Signal")
-alertcondition(condition=ccl, title=CL, message="Triggered Close Long Signal")
+alertcondition(condition=sos, title=OS, message="Triggered Open Short Signal")
+alertcondition(condition=scs, title=CS, message="Triggered Close Short Signal")
+alertcondition(condition=sol, title=OL, message="Triggered Open Long Signal")
+alertcondition(condition=scl, title=CL, message="Triggered Close Long Signal")

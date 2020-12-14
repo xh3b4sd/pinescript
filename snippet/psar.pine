@@ -1,0 +1,14 @@
+// new_psi returns parabolic SAR indicators for short and long trends.
+//
+//     sta    0.02
+//     inc    0.0005
+//     max    0.2
+//
+new_psi(sta, inc, max) =>
+    dir = sar(sta, inc, max) < close ? 1 : -1
+
+    sho = dir == -1 and dir[1] == 1 // Short direction indicator.
+    lon = dir == 1 and dir[1] == -1 // Long direction indicator.
+    cha = dir != dir[1]             // Change direction indicator.
+
+    [sho, lon, cha]
